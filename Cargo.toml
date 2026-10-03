@@ -5,7 +5,7 @@ edition = "2024"
 description = "Sort Tailwind CSS classes in HTML and CSS files."
 license = "MIT"
 authors = ["Martin Mahner <martin@mahner.org>"]
-repository = "https://github.com/bartTC/tailwhip"
+repository = "https://github.com/bartTC/taiwhip-rust"
 
 [lib]
 name = "tailwhip"

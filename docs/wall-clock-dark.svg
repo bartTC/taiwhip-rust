@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 352" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" role="img" aria-label="Wall clock per run, Python versus Rust, median of 30 runs">
+<rect width="760" height="352" fill="#1e2127"/>
+<text x="20" y="26" font-size="14" font-weight="600" fill="#eceef2">Wall clock per run, median of 30, lower is better</text>
+<rect x="20" y="36" width="12" height="12" rx="3" fill="#3987e5"/><text x="38" y="47" font-size="12" fill="#a3a9b5">Python 0.14.0</text>
+<rect x="140" y="36" width="12" height="12" rx="3" fill="#d95926"/><text x="158" y="47" font-size="12" fill="#a3a9b5">Rust port</text>
+<line x1="270.0" y1="58" x2="270.0" y2="308" stroke="#2f343d"/>
+<text x="270.0" y="326" font-size="11" text-anchor="middle" fill="#a3a9b5">0</text>
+<line x1="416.7" y1="58" x2="416.7" y2="308" stroke="#2f343d"/>
+<text x="416.7" y="326" font-size="11" text-anchor="middle" fill="#a3a9b5">100</text>
+<line x1="563.3" y1="58" x2="563.3" y2="308" stroke="#2f343d"/>
+<text x="563.3" y="326" font-size="11" text-anchor="middle" fill="#a3a9b5">200</text>
+<line x1="710.0" y1="58" x2="710.0" y2="308" stroke="#2f343d"/>
+<text x="710.0" y="326" font-size="11" text-anchor="middle" fill="#a3a9b5">300</text>
+<text x="710" y="344" font-size="11" text-anchor="end" fill="#a3a9b5">milliseconds</text>
+<text x="20" y="80" font-size="13" fill="#eceef2">One-line stdin call</text>
+<text x="20" y="96" font-size="11" fill="#a3a9b5">editor integration</text>
+<path d="M270,70 h94.3 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-94.3 z" fill="#3987e5"/>
+<text x="374.3" y="80" font-size="11" fill="#a3a9b5">67.0 ms</text>
+<path d="M270,84 h0.8 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-0.8 z" fill="#d95926"/>
+<text x="280.8" y="94" font-size="11" fill="#a3a9b5">3.3 ms</text>
+<line x1="20" y1="108" x2="710" y2="108" stroke="#2f343d"/>
+<text x="20" y="130" font-size="13" fill="#eceef2">3.8 MB file on stdin</text>
+<text x="20" y="146" font-size="11" fill="#a3a9b5">24,690 class lists</text>
+<path d="M270,120 h282.9 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-282.9 z" fill="#3987e5"/>
+<text x="562.9" y="130" font-size="11" fill="#a3a9b5">195.6 ms</text>
+<path d="M270,134 h71.8 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-71.8 z" fill="#d95926"/>
+<text x="351.8" y="144" font-size="11" fill="#a3a9b5">51.7 ms</text>
+<line x1="20" y1="158" x2="710" y2="158" stroke="#2f343d"/>
+<text x="20" y="180" font-size="13" fill="#eceef2">Dry run, 525 synthetic files</text>
+<text x="20" y="196" font-size="11" fill="#a3a9b5">3.9 MB</text>
+<path d="M270,170 h413.0 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-413.0 z" fill="#3987e5"/>
+<text x="693.0" y="180" font-size="11" fill="#a3a9b5">284.3 ms</text>
+<path d="M270,184 h17.9 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-17.9 z" fill="#d95926"/>
+<text x="297.9" y="194" font-size="11" fill="#a3a9b5">14.9 ms</text>
+<line x1="20" y1="208" x2="710" y2="208" stroke="#2f343d"/>
+<text x="20" y="230" font-size="13" fill="#eceef2">Dry run, 165 real templates</text>
+<text x="20" y="246" font-size="11" fill="#a3a9b5">Django project</text>
+<path d="M270,220 h164.7 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-164.7 z" fill="#3987e5"/>
+<text x="444.7" y="230" font-size="11" fill="#a3a9b5">115.0 ms</text>
+<path d="M270,234 h6.3 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-6.3 z" fill="#d95926"/>
+<text x="286.3" y="244" font-size="11" fill="#a3a9b5">7.0 ms</text>
+<line x1="20" y1="258" x2="710" y2="258" stroke="#2f343d"/>
+<text x="20" y="280" font-size="13" fill="#eceef2">Dry run, 252 real templates</text>
+<text x="20" y="296" font-size="11" fill="#a3a9b5">second Django project</text>
+<path d="M270,270 h199.1 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-199.1 z" fill="#3987e5"/>
+<text x="479.1" y="280" font-size="11" fill="#a3a9b5">138.5 ms</text>
+<path d="M270,284 h22.8 a4,4 0 0 1 4,4 v4 a4,4 0 0 1 -4,4 h-22.8 z" fill="#d95926"/>
+<text x="302.8" y="294" font-size="11" fill="#a3a9b5">18.3 ms</text>
+</svg>

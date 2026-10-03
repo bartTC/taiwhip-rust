@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 290" font-family="IBM Plex Sans, Helvetica Neue, Arial, sans-serif" role="img" aria-label="A run loads the configuration, then either sorts piped stdin and writes it back, or finds files and processes each one on all cores">
+<rect width="920" height="290" fill="#1e2127"/>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eceef2"/></marker></defs>
+<g fill="none" stroke="#eceef2" stroke-width="1.2" marker-end="url(#arrow)">
+<line x1="136" y1="46" x2="164" y2="46"/><line x1="356" y1="46" x2="384" y2="46"/><line x1="496" y1="46" x2="524" y2="46"/>
+<line x1="622" y1="46" x2="650" y2="46"/><line x1="772" y1="46" x2="800" y2="46"/><path d="M441,68 V96 H78 V126"/>
+<line x1="136" y1="150" x2="174" y2="150"/><line x1="262" y1="150" x2="286" y2="150"/><line x1="412" y1="150" x2="436" y2="150"/>
+<line x1="556" y1="150" x2="580" y2="150"/><line x1="710" y1="150" x2="734" y2="150"/><line x1="811" y1="172" x2="811" y2="224"/>
+</g>
+<rect x="160" y="108" width="740" height="88" rx="8" fill="none" stroke="#f08a5d" stroke-width="1.2" stroke-dasharray="5 4"/>
+<text x="172" y="121" font-size="10" fill="#f08a5d" font-weight="600" letter-spacing="0.06em">PER FILE, ON ALL CORES</text>
+<g stroke="#eceef2" stroke-width="1.2" fill="#262a31">
+<rect x="20" y="24" width="116" height="44" rx="6"/><rect x="166" y="24" width="190" height="44" rx="6"/><rect x="386" y="24" width="110" height="44" rx="22"/>
+<rect x="526" y="24" width="96" height="44" rx="6"/><rect x="652" y="24" width="120" height="44" rx="6"/><rect x="802" y="24" width="98" height="44" rx="6"/>
+<rect x="20" y="128" width="116" height="44" rx="6"/><rect x="176" y="128" width="86" height="44" rx="6"/><rect x="288" y="128" width="124" height="44" rx="6"/>
+<rect x="438" y="128" width="118" height="44" rx="6"/><rect x="582" y="128" width="128" height="44" rx="6"/><rect x="736" y="128" width="150" height="44" rx="6"/>
+<rect x="736" y="226" width="150" height="44" rx="6"/>
+</g>
+<g fill="#eceef2" font-size="12" text-anchor="middle">
+<text x="78" y="50">CLI arguments</text>
+<text x="261" y="43">Load configuration</text><text x="261" y="58" font-size="10" fill="#a3a9b5">defaults → pyproject → file → flags</text>
+<text x="441" y="50">stdin piped?</text><text x="511" y="39" font-size="10" fill="#a3a9b5">yes</text><text x="455" y="90" font-size="10" fill="#a3a9b5">no</text>
+<text x="574" y="50">Read stdin</text><text x="712" y="50">Sort class lists</text><text x="851" y="50">Write stdout</text>
+<text x="78" y="147">Find files</text><text x="78" y="162" font-size="10" fill="#a3a9b5">walk, globs, dedupe</text>
+<text x="219" y="154">Read file</text>
+<text x="350" y="147">Find class lists</text><text x="350" y="162" font-size="10" fill="#a3a9b5">regex, classes group</text>
+<text x="497" y="147">Sort each list</text><text x="497" y="162" font-size="10" fill="#a3a9b5">cache per thread</text>
+<text x="646" y="154">Splice, compare</text>
+<text x="811" y="147">Write or report</text><text x="811" y="162" font-size="10" fill="#a3a9b5">--write, or "Would update"</text>
+<text x="811" y="245">Summary</text><text x="811" y="260" font-size="10" fill="#a3a9b5">changed, skipped, time</text>
+</g>
+</svg>
