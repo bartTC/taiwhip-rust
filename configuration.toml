@@ -1,0 +1,897 @@
+# ============================================================================
+# Tailwhip Default Configuration
+# ============================================================================
+#
+# This is the base configuration file for Tailwhip. These settings define how
+# Tailwind CSS classes are sorted and which files are processed.
+#
+# THE GOLDEN RULE: If it's not in this TOML, it doesn't affect sorting.
+# Every sort decision can be traced back to an ordered list in this file.
+#
+# CUSTOMIZATION:
+#   You can override these settings in two ways:
+#   1. Create a [tool.tailwhip] section in your project's pyproject.toml
+#   2. Create a custom config file and pass it via --configuration flag
+#
+# PRECEDENCE (lowest to highest):
+#   defaults (this file) < pyproject.toml < custom config < CLI arguments
+# ============================================================================
+
+
+# ----------------------------------------------------------------------------
+# Output Settings
+# ----------------------------------------------------------------------------
+
+verbosity = 1
+write_mode = false
+
+
+# ----------------------------------------------------------------------------
+# File Discovery
+# ----------------------------------------------------------------------------
+
+default_globs = [
+    "**/*.html",
+    "**/*.css",
+]
+
+
+# ----------------------------------------------------------------------------
+# Template Expression Handling
+# ----------------------------------------------------------------------------
+
+skip_expressions = [
+    "{{",
+    "{%",
+    "<%",
+    "?",
+]
+
+
+# ----------------------------------------------------------------------------
+# Variant Recognition
+# ----------------------------------------------------------------------------
+
+variant_separator = ":"
+
+
+# ============================================================================
+# SORTING CONFIGURATION
+# ============================================================================
+#
+# THE GOLDEN RULE: Everything follows lists. If you want to know why class A
+# sorts before class B, look at the lists below.
+#
+# The lists cover the utilities and variants of Tailwind CSS 4.3 and remain
+# compatible with Tailwind CSS 3 class names.
+#
+# Each Tailwind class is parsed into components:
+#
+#   !sm:hover:-border-t-2
+#   │ │  │    ││      │ └── value: "2"
+#   │ │  │    ││      └── direction: "t"
+#   │ │  │    │└── prefix: "border"
+#   │ │  │    └── negated: true (tracked, doesn't affect sort)
+#   │ │  └── variant: "hover"
+#   │ └── variant: "sm"
+#   └── important: true (tracked, doesn't affect sort)
+#
+#   bg-red-500/50
+#   │  │   │   └── alpha: "50"
+#   │  │   └── shade: "500"
+#   │  └── color: "red"
+#   └── prefix: "bg"
+#
+#   rounded-t-lg
+#   │       │ └── size: "lg"
+#   │       └── direction: "t"
+#   └── prefix: "rounded"
+#
+# Sort order is determined by:
+#   1. component_order: Which component types are compared first
+#   2. Individual lists: The position within each component's list
+
+
+# ----------------------------------------------------------------------------
+# Component Order
+# ----------------------------------------------------------------------------
+#
+# Defines the ORDER in which components are compared during sorting.
+# Components listed earlier have higher priority.
+
+component_order = [
+    "variant",
+    "prefix",
+    "direction",
+    "size",
+    "value",
+    "color",
+    "shade",
+    "alpha",
+]
+
+
+# ----------------------------------------------------------------------------
+# Variants
+# ----------------------------------------------------------------------------
+
+variants = [
+    # Container queries
+    "@3xs",
+    "@2xs",
+    "@xs",
+    "@sm",
+    "@md",
+    "@lg",
+    "@xl",
+    "@2xl",
+    "@3xl",
+    "@4xl",
+    "@5xl",
+    "@6xl",
+    "@7xl",
+    "@min",
+    "@max",
+
+    # Direction & theme
+    "rtl",
+    "ltr",
+    "dark",
+
+    # Media
+    "portrait",
+    "landscape",
+    "print",
+    "motion-safe",
+    "motion-reduce",
+    "contrast-more",
+    "contrast-less",
+    "forced-colors",
+    "inverted-colors",
+    "pointer-none",
+    "pointer-coarse",
+    "pointer-fine",
+    "any-pointer-none",
+    "any-pointer-coarse",
+    "any-pointer-fine",
+    "noscript",
+    "supports",
+
+    # Breakpoints
+    "sm",
+    "md",
+    "lg",
+    "xl",
+    "2xl",
+    "3xl",
+
+    # Arbitrary breakpoints
+    "min",
+    "max",
+
+    # Structural
+    "first",
+    "last",
+    "only",
+    "odd",
+    "even",
+    "first-of-type",
+    "last-of-type",
+    "only-of-type",
+    "nth",
+
+    # State
+    "visited",
+    "target",
+    "open",
+    "empty",
+    "enabled",
+    "disabled",
+    "read-only",
+    "required",
+    "optional",
+    "checked",
+    "indeterminate",
+    "default",
+    "valid",
+    "invalid",
+    "user-valid",
+    "user-invalid",
+    "in-range",
+    "out-of-range",
+    "placeholder-shown",
+    "autofill",
+    "inert",
+    "starting",
+
+    # Interactive
+    "focus-within",
+    "hover",
+    "focus",
+    "focus-visible",
+    "active",
+    "pressed",
+    "selected",
+    "current",
+
+    # Aria/Data
+    "aria-checked",
+    "aria-disabled",
+    "aria-expanded",
+    "aria-hidden",
+    "aria-pressed",
+    "aria-readonly",
+    "aria-required",
+    "aria-selected",
+    "data-active",
+    "data-disabled",
+    "data-state",
+    "aria",
+    "data",
+
+    # Group
+    "group-hover",
+    "group-focus",
+    "group-focus-within",
+    "group-active",
+    "group",
+
+    # Peer
+    "peer-hover",
+    "peer-focus",
+    "peer-checked",
+    "peer-disabled",
+    "peer-invalid",
+    "peer",
+
+    # Relational & negation
+    "has",
+    "in",
+    "not",
+
+    # Pseudo-elements
+    "before",
+    "after",
+    "marker",
+    "selection",
+    "file",
+    "placeholder",
+    "backdrop",
+    "first-letter",
+    "first-line",
+    "details-content",
+
+    # Descendants
+    "*",
+    "**",
+]
+
+
+# ----------------------------------------------------------------------------
+# Prefixes
+# ----------------------------------------------------------------------------
+
+prefixes = [
+    # Components
+    "container",
+    "@container",
+
+    # Accessibility
+    "sr-only",
+    "not-sr-only",
+    "forced-color-adjust",
+
+    # Layout & Display
+    "hidden",
+    "visible",
+    "invisible",
+    "collapse",
+    "block",
+    "inline-block",
+    "inline",
+    "table",
+    "inline-table",
+    "caption",
+    "flow-root",
+    "contents",
+
+    # Box model
+    "box-border",
+    "box-content",
+    "box-decoration-slice",
+    "box-decoration-clone",
+
+    # Isolation
+    "isolate",
+    "isolation-auto",
+
+    # Positioning
+    "static",
+    "fixed",
+    "absolute",
+    "relative",
+    "sticky",
+    "inset",
+    "inset-x",
+    "inset-y",
+    "top",
+    "right",
+    "bottom",
+    "left",
+    "start",
+    "end",
+    "z",
+
+    # Floats and clears
+    "float-left",
+    "float-right",
+    "float-none",
+    "float-start",
+    "float-end",
+    "clear-left",
+    "clear-right",
+    "clear-both",
+    "clear-none",
+    "clear-start",
+    "clear-end",
+
+    # Columns
+    "columns",
+
+    # Break
+    "break-inside",
+    "break-before",
+    "break-after",
+
+    # Overflow
+    "overflow",
+    "overflow-x",
+    "overflow-y",
+    "overscroll",
+    "overscroll-x",
+    "overscroll-y",
+
+    # Scrolling
+    "scroll",
+    "scroll-m",
+    "scroll-mx",
+    "scroll-my",
+    "scroll-mt",
+    "scroll-mr",
+    "scroll-mb",
+    "scroll-ml",
+    "scroll-ms",
+    "scroll-me",
+    "scroll-mbs",
+    "scroll-mbe",
+    "scroll-p",
+    "scroll-px",
+    "scroll-py",
+    "scroll-pt",
+    "scroll-pr",
+    "scroll-pb",
+    "scroll-pl",
+    "scroll-ps",
+    "scroll-pe",
+    "scroll-pbs",
+    "scroll-pbe",
+    "scroll-smooth",
+    "snap",
+    "snap-x",
+    "snap-y",
+
+    # Flexbox & Grid ordering
+    "order",
+    "grow",
+    "shrink",
+    "basis",
+
+    # Flex
+    "flex",
+    "inline-flex",
+    "flex-col",
+    "flex-col-reverse",
+    "flex-row",
+    "flex-row-reverse",
+    "flex-wrap",
+    "flex-wrap-reverse",
+    "flex-nowrap",
+    "flex-1",
+    "flex-auto",
+    "flex-initial",
+    "flex-none",
+
+    # Grid
+    "grid",
+    "inline-grid",
+    "grid-cols",
+    "grid-rows",
+    "grid-flow",
+    "grid-flow-col",
+    "grid-flow-row",
+    "grid-flow-dense",
+    "grid-flow-col-dense",
+    "grid-flow-row-dense",
+    "auto-cols",
+    "auto-rows",
+    "col",
+    "col-span",
+    "col-start",
+    "col-end",
+    "row",
+    "row-span",
+    "row-start",
+    "row-end",
+    "gap",
+    "gap-x",
+    "gap-y",
+    "space-x",
+    "space-y",
+
+    # Alignment
+    "place-content",
+    "place-items",
+    "place-self",
+    "content",
+    "items",
+    "self",
+    "justify",
+    "justify-items",
+    "justify-self",
+    "align",
+
+    # Sizing
+    "size",
+    "w",
+    "min-w",
+    "max-w",
+    "h",
+    "min-h",
+    "max-h",
+    "min-inline",
+    "max-inline",
+    "min-block",
+    "max-block",
+    "aspect",
+
+    # Margin
+    "m",
+    "mx",
+    "my",
+    "mt",
+    "mr",
+    "mb",
+    "ml",
+    "ms",
+    "me",
+    "mbs",
+    "mbe",
+
+    # Padding
+    "p",
+    "px",
+    "py",
+    "pt",
+    "pr",
+    "pb",
+    "pl",
+    "ps",
+    "pe",
+    "pbs",
+    "pbe",
+
+    # Typography
+    "font",
+    "font-stretch",
+    "font-features",
+    "text",
+    "text-wrap",
+    "text-nowrap",
+    "text-balance",
+    "text-pretty",
+    "tracking",
+    "leading",
+    "list",
+    "indent",
+    "tab",
+    "whitespace",
+    "break-words",
+    "break-all",
+    "break-keep",
+    "wrap",
+    "hyphens",
+    "line-clamp",
+    "antialiased",
+    "subpixel-antialiased",
+    "truncate",
+    "normal-nums",
+    "tabular-nums",
+    "slashed-zero",
+    "lining-nums",
+    "oldstyle-nums",
+    "proportional-nums",
+    "ordinal",
+    "diagonal-fractions",
+    "stacked-fractions",
+
+    # Text decoration
+    "underline",
+    "overline",
+    "line-through",
+    "no-underline",
+    "decoration",
+
+    # Text transform
+    "uppercase",
+    "lowercase",
+    "capitalize",
+    "normal-case",
+
+    # Font style
+    "italic",
+    "not-italic",
+
+    # Backgrounds
+    "bg",
+    "bg-gradient",
+    "bg-linear",
+    "bg-radial",
+    "bg-conic",
+    "from",
+    "via",
+    "to",
+
+    # Borders
+    "rounded",
+    "border",
+    "divide",
+    "ring",
+    "ring-offset",
+    "inset-ring",
+    "outline",
+
+    # Effects
+    "shadow",
+    "inset-shadow",
+    "text-shadow",
+    "opacity",
+    "mix-blend",
+    "mask",
+    "mask-clip",
+    "mask-origin",
+    "mask-type",
+    "backdrop",
+    "backdrop-blur",
+    "backdrop-brightness",
+    "backdrop-contrast",
+    "backdrop-grayscale",
+    "backdrop-hue-rotate",
+    "backdrop-invert",
+    "backdrop-opacity",
+    "backdrop-saturate",
+    "backdrop-sepia",
+
+    # Filters
+    "filter",
+    "blur",
+    "brightness",
+    "contrast",
+    "grayscale",
+    "hue-rotate",
+    "invert",
+    "saturate",
+    "sepia",
+    "drop-shadow",
+
+    # Transforms
+    "transform",
+    "transform-gpu",
+    "transform-none",
+    "transform-3d",
+    "transform-flat",
+    "scale",
+    "scale-x",
+    "scale-y",
+    "scale-z",
+    "scale-3d",
+    "rotate",
+    "rotate-x",
+    "rotate-y",
+    "rotate-z",
+    "translate",
+    "translate-x",
+    "translate-y",
+    "translate-z",
+    "skew",
+    "skew-x",
+    "skew-y",
+    "origin",
+    "perspective",
+    "perspective-origin",
+    "backface",
+    "zoom",
+
+    # Transitions & Animation
+    "transition",
+    "duration",
+    "ease",
+    "delay",
+    "animate",
+
+    # Interactivity
+    "cursor",
+    "select",
+    "pointer-events",
+    "resize",
+    "appearance",
+    "accent",
+    "caret",
+    "touch",
+    "will-change",
+    "scheme",
+    "field-sizing",
+    "scrollbar",
+    "scrollbar-thumb",
+    "scrollbar-track",
+    "scrollbar-gutter",
+
+    # Object
+    "object",
+
+    # SVG
+    "stroke",
+    "fill",
+
+    # Placeholder
+    "placeholder",
+
+    # Group/Peer
+    "peer",
+    "group",
+]
+
+
+# ----------------------------------------------------------------------------
+# Directions
+# ----------------------------------------------------------------------------
+
+directions = [
+    "x",
+    "y",
+    "t",
+    "tr",
+    "r",
+    "br",
+    "b",
+    "bl",
+    "l",
+    "tl",
+    "s",
+    "ss",
+    "se",
+    "e",
+    "ee",
+    "es",
+    "bs",
+    "be",
+]
+
+
+# ----------------------------------------------------------------------------
+# Sizes
+# ----------------------------------------------------------------------------
+
+sizes = [
+    "3xs",
+    "2xs",
+    "xs",
+    "sm",
+    "md",
+    "lg",
+    "xl",
+    "2xl",
+    "3xl",
+    "4xl",
+    "5xl",
+    "6xl",
+    "7xl",
+    "8xl",
+    "9xl",
+    "full",
+    "screen",
+    "svw",
+    "lvw",
+    "dvw",
+    "svh",
+    "lvh",
+    "dvh",
+    "min",
+    "max",
+    "fit",
+]
+
+
+# ----------------------------------------------------------------------------
+# Values (spacing/sizing numbers)
+# ----------------------------------------------------------------------------
+#
+# This list contains numeric values for spacing and sizing utilities.
+# Keywords like "auto", "none", and styles like "solid", "dashed" are not included
+# since mutually exclusive values (e.g., m-4 vs m-auto) don't need explicit ordering.
+
+numerics = [
+    # Zero and fractions
+    "0",
+    "px",
+    "0.5",
+    "1",
+    "1.5",
+    "2",
+    "2.5",
+    "3",
+    "3.5",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "14",
+    "16",
+    "20",
+    "24",
+    "28",
+    "32",
+    "36",
+    "40",
+    "44",
+    "48",
+    "52",
+    "56",
+    "60",
+    "64",
+    "72",
+    "80",
+    "96",
+]
+
+
+# ----------------------------------------------------------------------------
+# Colors
+# ----------------------------------------------------------------------------
+#
+# Colors are sorted alphabetically at runtime (merged with custom_colors).
+# The order here doesn't affect sorting - it's just for documentation.
+
+colors = [
+    "amber",
+    "black",
+    "blue",
+    "current",
+    "cyan",
+    "emerald",
+    "fuchsia",
+    "gray",
+    "green",
+    "indigo",
+    "inherit",
+    "lime",
+    "mauve",
+    "mist",
+    "neutral",
+    "olive",
+    "orange",
+    "pink",
+    "purple",
+    "red",
+    "rose",
+    "sky",
+    "slate",
+    "stone",
+    "taupe",
+    "teal",
+    "transparent",
+    "violet",
+    "white",
+    "yellow",
+    "zinc",
+]
+
+custom_colors = []
+
+
+# ----------------------------------------------------------------------------
+# Shades
+# ----------------------------------------------------------------------------
+
+shades = [
+    "50",
+    "100",
+    "200",
+    "300",
+    "400",
+    "500",
+    "600",
+    "700",
+    "800",
+    "900",
+    "950",
+]
+
+
+# ----------------------------------------------------------------------------
+# Alpha (Opacity)
+# ----------------------------------------------------------------------------
+
+alphas = [
+    "0",
+    "5",
+    "10",
+    "15",
+    "20",
+    "25",
+    "30",
+    "35",
+    "40",
+    "45",
+    "50",
+    "55",
+    "60",
+    "65",
+    "70",
+    "75",
+    "80",
+    "85",
+    "90",
+    "95",
+    "100",
+]
+
+
+# ----------------------------------------------------------------------------
+# Pattern Matching (Advanced)
+# ----------------------------------------------------------------------------
+#
+# These patterns define where Tailwhip finds classes to sort (HTML attributes,
+# CSS @apply directives, JSX props, ...). Each pattern is a regular expression
+# with a named group "classes". Only the text matched by that group is
+# replaced, with the same classes in sorted order; everything around it stays
+# exactly as written, including quotes, spacing and letter case.
+#
+# SYNTAX: Rust regex syntax, see https://docs.rs/regex/latest/regex/#syntax
+#   - Named groups are written (?P<classes>...) or (?<classes>...)
+#   - Flags go at the start, e.g. (?i) for case-insensitive matching
+#   - (?-u:\b) is an ASCII word boundary. It is equivalent to \b for
+#     attribute names and several times faster to scan for
+#   - Backreferences and lookaround are not supported. Quote styles are
+#     therefore separate patterns: "..." and '...' each get their own entry
+#
+# CUSTOMIZATION:
+#   IMPORTANT: Custom class_patterns REPLACE (not extend) the defaults, just like
+#   any other configuration setting. If you define class_patterns, you must include
+#   the default HTML and CSS patterns if you want to keep them.
+#
+# EXAMPLES:
+#   - JSX:    regex = '''(?-u:\b)className\s*=\s*"(?P<classes>[^"]*)"'''
+#   - Vue:    regex = ''':class\s*=\s*"(?P<classes>[^"]*)"'''
+#   - Svelte: regex = '''(?-u:\b)class:\w+\s*=\s*"(?P<classes>[^"]*)"'''
+#
+# RECOMMENDATION: The default patterns cover most use cases. Only add patterns
+# if you're working with frameworks or syntaxes not covered below.
+
+[[class_patterns]]
+name = "html_class"
+regex = '''(?i)(?-u:\b)class\s*=\s*"(?P<classes>[^"]*)"'''
+
+# The same for single quotes. Written as a basic string, where "\\" is one
+# backslash, because a literal string cannot end in a single quote.
+[[class_patterns]]
+name = "html_class_single_quoted"
+regex = "(?i)(?-u:\\b)class\\s*=\\s*'(?P<classes>[^']*)'"
+
+[[class_patterns]]
+name = "css_apply"
+regex = '''(?i)@apply\s+(?P<classes>[^;]+);'''
