@@ -491,6 +491,56 @@ fn pyproject_is_found_in_parent_directories() {
 }
 
 #[test]
+fn skip_expressions_from_pyproject_leave_lists_alone() {
+    let project = TempDir::new().unwrap();
+    write(
+        project.path(),
+        "pyproject.toml",
+        "[tool.tailwhip]\nskip_expressions = [\"&\"]\n",
+    );
+    let alpine = r#"<div :class="open && 'p-4 m-2'" class="p-4 m-2">"#;
+    let run = tailwhip(&[], project.path(), Some(alpine));
+    assert_eq!(
+        run.stdout,
+        r#"<div :class="open && 'p-4 m-2'" class="m-2 p-4">"#
+    );
+    // With the default skip expressions, the Alpine expression is sorted
+    let elsewhere = TempDir::new().unwrap();
+    let run = tailwhip(&[], elsewhere.path(), Some(alpine));
+    assert!(!run.stdout.contains("open && 'p-4"), "{}", run.stdout);
+}
+
+#[test]
+fn pyproject_is_found_from_the_paths_not_the_working_directory() {
+    let project = TempDir::new().unwrap();
+    write(
+        project.path(),
+        "pyproject.toml",
+        "[tool.tailwhip]\nskip_expressions = [\"&\"]\n",
+    );
+    let page = write(
+        project.path(),
+        "templates/page.html",
+        r#"<div :class="open && 'p-4 m-2'">"#,
+    );
+    let elsewhere = TempDir::new().unwrap();
+    let templates = project.path().join("templates");
+    let glob = format!("{}/**/*.html", project.path().display());
+    for arg in [
+        templates.to_str().unwrap(),
+        page.to_str().unwrap(),
+        glob.as_str(),
+    ] {
+        let run = tailwhip(&[arg, "-v"], elsewhere.path(), None);
+        assert!(
+            run.stdout.contains("Already sorted"),
+            "{arg}: {}",
+            run.output()
+        );
+    }
+}
+
+#[test]
 fn pyproject_without_tool_section_is_ignored() {
     let tmp = TempDir::new().unwrap();
     write(tmp.path(), "pyproject.toml", "[project]\nname = \"x\"\n");

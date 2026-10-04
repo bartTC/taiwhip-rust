@@ -328,6 +328,30 @@ pub fn find_files(
     found
 }
 
+/// The deepest existing directory that contains all the paths, which may be
+/// files, directories or glob patterns. Settings are looked for from there,
+/// so that running against another project uses that project's settings.
+pub fn common_dir(paths: &[PathBuf], cwd: &Path) -> PathBuf {
+    let mut common: Option<PathBuf> = None;
+    for path in paths {
+        let path = absolute(path, cwd);
+        common = Some(match common {
+            None => path,
+            Some(common) => common
+                .components()
+                .zip(path.components())
+                .take_while(|(a, b)| a == b)
+                .map(|(a, _)| a)
+                .collect(),
+        });
+    }
+    let common = common.unwrap_or_else(|| cwd.to_path_buf());
+    common
+        .ancestors()
+        .find(|dir| dir.is_dir())
+        .map_or_else(|| cwd.to_path_buf(), Path::to_path_buf)
+}
+
 /// `path` made absolute against `cwd`, with `.` and `..` components removed.
 /// Unlike `canonicalize`, this needs no system calls, which matters for
 /// thousands of files.
@@ -655,6 +679,26 @@ mod tests {
         assert_eq!(max_depth("*/*.css"), Some(2));
         assert_eq!(max_depth("*.{css,scss}"), Some(1));
         assert_eq!(max_depth("{a/b,c}/*.css"), None);
+    }
+
+    #[test]
+    fn common_dir_contains_all_paths() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().canonicalize().unwrap();
+        fs::create_dir_all(root.join("a/b")).unwrap();
+        fs::create_dir_all(root.join("a/c")).unwrap();
+        fs::write(root.join("a/b/x.html"), "").unwrap();
+        let cwd = root.join("a/c");
+        let dir = |paths: &[&str]| {
+            let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+            common_dir(&paths, &cwd)
+        };
+        assert_eq!(dir(&["../b/x.html"]), root.join("a/b"));
+        assert_eq!(dir(&["../b"]), root.join("a/b"));
+        assert_eq!(dir(&["../b/**/*.html"]), root.join("a/b"));
+        assert_eq!(dir(&["../b/x.html", "."]), root.join("a"));
+        assert_eq!(dir(&["missing.html"]), cwd);
+        assert_eq!(dir(&[]), cwd);
     }
 
     #[test]

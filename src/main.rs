@@ -9,7 +9,7 @@ use lexopt::prelude::*;
 
 use tailwhip::config::{Config, find_pyproject, verbosity};
 use tailwhip::console::{Console, style};
-use tailwhip::files::{Options, apply_changes};
+use tailwhip::files::{Options, apply_changes, common_dir};
 use tailwhip::process::Processor;
 
 const HELP: &str = "\
@@ -130,10 +130,16 @@ fn main() -> ExitCode {
 
     let mut config = Config::default();
 
-    // 1. The nearest pyproject.toml overrides the defaults
-    if let Some(pyproject) = std::env::current_dir()
-        .ok()
-        .and_then(|cwd| find_pyproject(&cwd))
+    // 1. The nearest pyproject.toml overrides the defaults: nearest to the
+    //    paths being processed, so that running against another project
+    //    uses its settings, or to the current directory for stdin
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let search_from = if cli.paths.is_empty() {
+        cwd.clone()
+    } else {
+        common_dir(&cli.paths, &cwd)
+    };
+    if let Some(pyproject) = find_pyproject(&search_from)
         && let Err(error) = config.apply_pyproject(&pyproject)
     {
         eprintln!("{error}");

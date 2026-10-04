@@ -222,6 +222,9 @@ the sort was free to change, and these details differ on purpose:
   where Python normalized `class = "x"` to `class="x"`.
 - **The command line has the same flags plus `--no-ignore`**, but its own
   help text and error messages. Usage errors exit with code 2.
+- **`pyproject.toml` is looked for from the files being processed**, so
+  `tailwhip ../other-project/` uses that project's settings. The Python tool
+  looked from the current directory, which stdin still does.
 - **Configuration-file values for `verbosity` and `write_mode` are
   honored.** Python always overrode them with the command line defaults.
 - **Errors go to stderr** and are still shown with `--quiet`.
@@ -242,7 +245,9 @@ and every key replaces its default as a whole. `class_patterns` is empty by
 default, so setting it only adds patterns to the built-in ones:
 
 1. the built-in defaults in `configuration.toml`, embedded in the binary
-2. the `[tool.tailwhip]` section of the nearest `pyproject.toml`
+2. the `[tool.tailwhip]` section of the nearest `pyproject.toml`, looked for
+   from the deepest directory that contains all the paths given, or from the
+   current directory for stdin
 3. a file passed with `--configuration FILE`
 4. command line flags
 
