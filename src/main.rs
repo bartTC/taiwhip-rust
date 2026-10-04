@@ -5,20 +5,36 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
 
-use clap::{ArgAction, Parser};
+use lexopt::prelude::*;
 
 use tailwhip::config::{Config, find_pyproject, verbosity};
 use tailwhip::console::{Console, style};
-use tailwhip::files::{Options, apply_changes, find_files};
+use tailwhip::files::{Options, apply_changes, common_dir};
 use tailwhip::process::Processor;
 
-const LONG_ABOUT: &str = "\
+const HELP: &str = "\
 Sort Tailwind CSS classes in HTML and CSS files.
 
-Automatically discovers and sorts Tailwind classes according to a consistent
-ordering. Supports HTML, CSS, and template files with Tailwind @apply directives.";
+Usage: tailwhip [OPTIONS] [PATH]...
 
-const EXAMPLES: &str = "\
+Arguments:
+  [PATH]...                  Files or directories to process. Omit to read
+                             from stdin. Directories are searched for HTML
+                             and CSS files, skipping hidden files and what
+                             .gitignore excludes.
+
+Options:
+  -w, --write                Write changes to files (default: dry-run mode).
+  -q, --quiet                Suppress output except errors and warnings.
+  -v, --verbose              Increase output verbosity (-v: unchanged files
+                             and summary, -vv: diff). Repeatable.
+  -c, --configuration FILE   Load a configuration file (overrides
+                             pyproject.toml settings).
+      --no-ignore            Also process hidden files and files excluded by
+                             .gitignore when searching directories.
+  -h, --help                 Show this help and exit.
+  -V, --version              Show the version and exit.
+
 Examples:
 
   # Check a single file (dry-run by default)
@@ -37,60 +53,71 @@ Examples:
   tailwhip index.html -vv
 
   # Read from stdin and output to stdout
-  echo '<div class=\"mt-4 p-2 bg-blue-500\"></div>' | tailwhip";
+  echo '<div class=\"mt-4 p-2 bg-blue-500\"></div>' | tailwhip
+";
 
-#[derive(Debug, Parser)]
-#[command(
-    name = "tailwhip",
-    version,
-    about = "Sort Tailwind CSS classes in HTML and CSS files.",
-    long_about = LONG_ABOUT,
-    after_help = EXAMPLES,
-    disable_version_flag = true
-)]
+/// The command line arguments.
+#[derive(Debug, Default)]
 struct Cli {
-    #[arg(
-        value_name = "PATH",
-        help = "Files or directories to process. Omit to read from stdin."
-    )]
     paths: Vec<PathBuf>,
-
-    #[arg(short = 'V', long = "version", action = ArgAction::Version, help = "Show version and exit.")]
-    version: (),
-
-    #[arg(
-        short = 'w',
-        long = "write",
-        help = "Write changes to files (default: dry-run mode)."
-    )]
     write: bool,
-
-    #[arg(
-        short = 'q',
-        long = "quiet",
-        help = "Suppress output except errors and warnings."
-    )]
+    no_ignore: bool,
     quiet: bool,
-
-    #[arg(
-        short = 'v',
-        long = "verbose",
-        action = ArgAction::Count,
-        help = "Increase output verbosity (-v: changes, -vv: diff, -vvv: debug)."
-    )]
     verbose: u8,
-
-    #[arg(
-        short = 'c',
-        long = "configuration",
-        value_name = "FILE",
-        help = "Load custom configuration file (overrides pyproject.toml settings)."
-    )]
     configuration: Option<PathBuf>,
 }
 
+/// What the command line asks for.
+enum Command {
+    Run(Cli),
+    Help,
+    Version,
+}
+
+impl Cli {
+    /// Parse the arguments of this process. A hand-written parser over
+    /// `lexopt` instead of clap, which built its whole model of the command
+    /// line, help texts included, on every start.
+    fn parse() -> Result<Command, lexopt::Error> {
+        let mut cli = Cli::default();
+        let mut parser = lexopt::Parser::from_env();
+        while let Some(arg) = parser.next()? {
+            match arg {
+                Short('w') | Long("write") => cli.write = true,
+                Short('q') | Long("quiet") => cli.quiet = true,
+                Short('v') | Long("verbose") => cli.verbose = cli.verbose.saturating_add(1),
+                Short('c') | Long("configuration") => {
+                    cli.configuration = Some(parser.value()?.into());
+                }
+                Long("no-ignore") => cli.no_ignore = true,
+                Short('h') | Long("help") => return Ok(Command::Help),
+                Short('V') | Long("version") => return Ok(Command::Version),
+                Value(path) => cli.paths.push(path.into()),
+                _ => return Err(arg.unexpected()),
+            }
+        }
+        Ok(Command::Run(cli))
+    }
+}
+
 fn main() -> ExitCode {
-    let cli = Cli::parse();
+    let cli = match Cli::parse() {
+        Ok(Command::Run(cli)) => cli,
+        Ok(Command::Help) => {
+            print!("{HELP}");
+            return ExitCode::SUCCESS;
+        }
+        Ok(Command::Version) => {
+            println!("tailwhip {}", env!("CARGO_PKG_VERSION"));
+            return ExitCode::SUCCESS;
+        }
+        Err(error) => {
+            eprintln!(
+                "error: {error}\n\nUsage: tailwhip [OPTIONS] [PATH]...\nFor more information, try '--help'."
+            );
+            return ExitCode::from(2);
+        }
+    };
 
     // Setup configuration values ---------------------------------------------
 
@@ -103,10 +130,16 @@ fn main() -> ExitCode {
 
     let mut config = Config::default();
 
-    // 1. The nearest pyproject.toml overrides the defaults
-    if let Some(pyproject) = std::env::current_dir()
-        .ok()
-        .and_then(|cwd| find_pyproject(&cwd))
+    // 1. The nearest pyproject.toml overrides the defaults: nearest to the
+    //    paths being processed, so that running against another project
+    //    uses its settings, or to the current directory for stdin
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let search_from = if cli.paths.is_empty() {
+        cwd.clone()
+    } else {
+        common_dir(&cli.paths, &cwd)
+    };
+    if let Some(pyproject) = find_pyproject(&search_from)
         && let Err(error) = config.apply_pyproject(&pyproject)
     {
         eprintln!("{error}");
@@ -149,7 +182,7 @@ fn main() -> ExitCode {
     let console = Console::new(cli.quiet);
 
     if cli.paths.is_empty() {
-        console.error(&console.style(
+        console.error(console.style(
             style::RED,
             "Error: No paths provided. Provide file paths or pipe content to stdin.",
         ));
@@ -158,13 +191,15 @@ fn main() -> ExitCode {
 
     // Handle file mode --------------------------------------------------------
 
+    configure_thread_pool();
     let start = Instant::now();
-    let files = find_files(&cli.paths, &config.default_globs);
     let summary = apply_changes(
-        &files,
+        &cli.paths,
         &Options {
             processor: &processor,
             console: &console,
+            default_globs: &config.default_globs,
+            skip_ignored: !cli.no_ignore,
             write_mode: config.write_mode,
             verbosity: config.verbosity,
         },
@@ -172,22 +207,25 @@ fn main() -> ExitCode {
     let duration = start.elapsed();
 
     if !summary.found_any {
-        console.error(&console.style(style::RED, "Error: No files found"));
+        console.error(console.style(style::RED, "Error: No files found"));
         return ExitCode::FAILURE;
     }
 
     if config.verbosity >= verbosity::VERBOSE {
         if !config.write_mode {
-            console.print(&format!(
+            console.print(format_args!(
                 "\n⚠ Dry Run. No files were actually written. Use {} to write changes.",
                 console.style(style::IMPORTANT, " --write ")
             ));
         }
-        console.print(&format!(
+        console.print(format_args!(
             "⏱ Completed in {} for {} files. {}",
-            console.style(style::HIGHLIGHT, &format!("{:.3}s", duration.as_secs_f64())),
+            console.style(
+                style::HIGHLIGHT,
+                &format_args!("{:.3}s", duration.as_secs_f64())
+            ),
             summary.changed,
-            console.style(style::DIM, &format!("({} skipped)", summary.skipped)),
+            console.style(style::DIM, &format_args!("({} skipped)", summary.skipped)),
         ));
     }
 
@@ -196,6 +234,27 @@ fn main() -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+/// Threads for file mode, unless `RAYON_NUM_THREADS` says otherwise. Most
+/// of the work in a real project is reading directories and files, and on
+/// macOS that got slower with more threads: 250 templates in a tree of
+/// 5,000 files took 7 ms on six threads and 12 ms on sixteen. Sorting the
+/// classes of a large file keeps using every core: stdin mode leaves the
+/// pool alone.
+const MAX_FILE_THREADS: usize = 6;
+
+fn configure_thread_pool() {
+    if std::env::var_os("RAYON_NUM_THREADS").is_some() {
+        return;
+    }
+    let threads = std::thread::available_parallelism()
+        .map_or(1, |cores| cores.get())
+        .min(MAX_FILE_THREADS);
+    // Fails only if the pool already exists, which leaves it as it is
+    let _ = rayon::ThreadPoolBuilder::new()
+        .num_threads(threads)
+        .build_global();
 }
 
 /// Read all of stdin, sort its classes and write the result to stdout.

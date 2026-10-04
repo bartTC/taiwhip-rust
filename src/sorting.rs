@@ -6,9 +6,9 @@
 //! the corresponding list. See `configuration.toml` for the full description.
 
 use std::borrow::Cow;
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::config::Config;
@@ -71,6 +71,85 @@ pub struct SortKey<'a> {
     pub original: &'a str,
 }
 
+impl SortKey<'_> {
+    /// The key as bytes that compare like the key itself: for any two keys,
+    /// `a.cmp(&b) == a.to_bytes().cmp(&b.to_bytes())`. Kept from one class
+    /// list to the next, they let a list be sorted by plain byte comparisons
+    /// without parsing its classes again.
+    ///
+    /// Every field is written in comparison order: ranks as big-endian
+    /// numbers, offset by one so that -1 comes first, and strings with a
+    /// terminator that sorts before any byte they contain. The class name
+    /// comes last and needs no terminator.
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(64 + 2 * self.original.len());
+        for (rank, name) in &self.variants {
+            // Marks one more variant, so that a shorter list sorts first
+            out.push(1);
+            push_rank(&mut out, *rank);
+            push_terminated(&mut out, name);
+        }
+        out.push(0);
+        push_rank(&mut out, self.prefix.0);
+        push_terminated(&mut out, &self.prefix.1);
+        out.push(self.base);
+        // Always one entry per configured component
+        for (rank, value) in &self.components {
+            push_rank(&mut out, *rank);
+            push_terminated(&mut out, value);
+        }
+        out.push(self.suffix.0);
+        push_terminated(&mut out, &self.suffix.1);
+        out.extend_from_slice(self.original.as_bytes());
+        out
+    }
+}
+
+/// A rank from -1 up, as four big-endian bytes.
+fn push_rank(out: &mut Vec<u8>, rank: i64) {
+    let rank = u32::try_from(rank + 1).expect("ranks are list positions, -1 or MAX_RANK");
+    out.extend_from_slice(&rank.to_be_bytes());
+}
+
+/// `text` followed by `00 00`, with every `00` byte in it written as
+/// `00 ff`, so that a string sorts before every longer string it starts.
+fn push_terminated(out: &mut Vec<u8>, text: &str) {
+    for &byte in text.as_bytes() {
+        out.push(byte);
+        if byte == 0 {
+            out.push(0xff);
+        }
+    }
+    out.extend_from_slice(&[0, 0]);
+}
+
+/// The sort keys of classes seen before, as bytes (see
+/// [`SortKey::to_bytes`]), so that each distinct class is parsed only once.
+/// A cache must only be used with one sorter, since keys depend on its
+/// configuration.
+#[derive(Debug, Default)]
+pub struct KeyCache {
+    ids: FxHashMap<Box<str>, u32>,
+    keys: Vec<Box<[u8]>>,
+}
+
+/// Classes in a key cache before it is emptied.
+const KEY_CACHE_CAPACITY: usize = 32_768;
+
+impl KeyCache {
+    /// The id of a class's key, parsing the class if it is new.
+    fn id(&mut self, sorter: &Sorter, class: &str) -> u32 {
+        if let Some(&id) = self.ids.get(class) {
+            return id;
+        }
+        let id = u32::try_from(self.keys.len()).expect("the cache is emptied long before");
+        self.keys
+            .push(sorter.sort_key(class).to_bytes().into_boxed_slice());
+        self.ids.insert(class.into(), id);
+        id
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Component {
     Direction,
@@ -110,7 +189,7 @@ struct TokenRanks {
 
 /// Map each value to its position. A value listed twice keeps its last
 /// position, like a Python dict comprehension.
-fn index_of(values: &[String]) -> FxHashMap<String, i64> {
+fn index_of(values: &[Cow<'static, str>]) -> FxHashMap<Cow<'static, str>, i64> {
     values
         .iter()
         .enumerate()
@@ -140,15 +219,15 @@ struct Parsed<'a> {
 #[derive(Debug, Clone)]
 pub struct Sorter {
     variant_separator: String,
-    variant_index: FxHashMap<String, i64>,
-    /// `("name-", "name[", rank)` for variants that take an argument, such
-    /// as `min-[320px]` or `aria-busy`, in configuration order.
-    variant_prefixes: Vec<(String, String, i64)>,
-    prefix_index: FxHashMap<String, i64>,
-    alpha_index: FxHashMap<String, i64>,
+    variant_index: FxHashMap<Cow<'static, str>, i64>,
+    /// `(name, rank)` for variants that take an argument, such as
+    /// `min-[320px]` or `aria-busy`, in configuration order.
+    variant_prefixes: Vec<(Cow<'static, str>, i64)>,
+    prefix_index: FxHashMap<Cow<'static, str>, i64>,
+    alpha_index: FxHashMap<Cow<'static, str>, i64>,
     /// Which component lists a token appears in, and at which position.
     /// One table for all five lists, so parsing a token is a single lookup.
-    tokens: FxHashMap<String, TokenRanks>,
+    tokens: FxHashMap<Cow<'static, str>, TokenRanks>,
     /// The components to compare, in configured order. Unknown names in
     /// `component_order` are ignored; "variant" and "prefix" always come
     /// first and are handled separately.
@@ -159,37 +238,50 @@ impl Sorter {
     pub fn new(config: &Config) -> Sorter {
         let variant_index = index_of(&config.variants);
 
-        let mut seen = HashSet::new();
+        let mut seen = FxHashSet::default();
         let variant_prefixes = config
             .variants
             .iter()
-            .filter(|name| seen.insert(name.as_str()))
-            .map(|name| (format!("{name}-"), format!("{name}["), variant_index[name]))
+            .filter(|name| seen.insert(&**name))
+            .map(|name| (name.clone(), variant_index[&**name]))
             .collect();
 
         // Colors are merged with the custom colors and sorted alphabetically
-        let colors: BTreeSet<&str> = config
+        let colors: BTreeSet<&Cow<'static, str>> = config
             .colors
             .iter()
             .chain(config.custom_colors.iter())
-            .map(String::as_str)
             .collect();
 
-        let mut tokens: FxHashMap<String, TokenRanks> = FxHashMap::default();
-        for (token, rank) in index_of(&config.directions) {
-            tokens.entry(token).or_default().direction = Some(rank);
+        // Iterating in order, a token listed twice keeps its last position
+        let lists = [
+            &config.directions,
+            &config.sizes,
+            &config.numerics,
+            &config.shades,
+        ];
+        let capacity = lists.iter().map(|list| list.len()).sum::<usize>() + colors.len();
+        let mut tokens: FxHashMap<Cow<'static, str>, TokenRanks> =
+            FxHashMap::with_capacity_and_hasher(capacity, Default::default());
+        let mut set = |token: &Cow<'static, str>,
+                       field: fn(&mut TokenRanks) -> &mut Option<i64>,
+                       rank: usize| {
+            *field(tokens.entry(token.clone()).or_default()) = Some(rank as i64);
+        };
+        for (rank, token) in config.directions.iter().enumerate() {
+            set(token, |ranks| &mut ranks.direction, rank);
         }
-        for (token, rank) in index_of(&config.sizes) {
-            tokens.entry(token).or_default().size = Some(rank);
+        for (rank, token) in config.sizes.iter().enumerate() {
+            set(token, |ranks| &mut ranks.size, rank);
         }
-        for (token, rank) in index_of(&config.numerics) {
-            tokens.entry(token).or_default().value = Some(rank);
+        for (rank, token) in config.numerics.iter().enumerate() {
+            set(token, |ranks| &mut ranks.value, rank);
         }
         for (rank, color) in colors.into_iter().enumerate() {
-            tokens.entry(color.to_string()).or_default().color = Some(rank as i64);
+            set(color, |ranks| &mut ranks.color, rank);
         }
-        for (token, rank) in index_of(&config.shades) {
-            tokens.entry(token).or_default().shade = Some(rank);
+        for (rank, token) in config.shades.iter().enumerate() {
+            set(token, |ranks| &mut ranks.shade, rank);
         }
 
         Sorter {
@@ -375,8 +467,11 @@ impl Sorter {
         if let Some(&rank) = self.variant_index.get(variant) {
             return rank;
         }
-        for (dashed, bracketed, rank) in &self.variant_prefixes {
-            if variant.starts_with(dashed.as_str()) || variant.starts_with(bracketed.as_str()) {
+        for (name, rank) in &self.variant_prefixes {
+            if variant
+                .strip_prefix(&**name)
+                .is_some_and(|argument| argument.starts_with(['-', '[']))
+            {
                 return *rank;
             }
         }
@@ -449,6 +544,31 @@ impl Sorter {
         keyed.sort_unstable();
         keyed.dedup_by(|a, b| a.original == b.original);
         keyed.into_iter().map(|key| key.original).collect()
+    }
+
+    /// [`sort_classes`](Self::sort_classes) with the keys taken from
+    /// `cache`, which must only ever be used with this sorter. The classes
+    /// are sorted as 4-byte ids into the cache, which makes for less copying
+    /// than sorting the keys themselves.
+    pub fn sort_classes_cached<'a>(
+        &self,
+        classes: &[&'a str],
+        cache: &mut KeyCache,
+    ) -> Vec<&'a str> {
+        // Emptied between lists only, never while a list holds ids
+        if cache.keys.len() + classes.len() > KEY_CACHE_CAPACITY {
+            cache.ids.clear();
+            cache.keys.clear();
+        }
+        let mut items: SmallVec<[(u32, &'a str); 16]> = classes
+            .iter()
+            .map(|&class| (cache.id(self, class), class))
+            .collect();
+        let keys = &cache.keys;
+        items.sort_unstable_by(|a, b| keys[a.0 as usize].cmp(&keys[b.0 as usize]));
+        // The same class has the same id; different classes never compare equal
+        items.dedup_by_key(|item| item.0);
+        items.into_iter().map(|(_, class)| class).collect()
     }
 }
 
@@ -579,6 +699,93 @@ mod tests {
             join_tokens(utility, &tokens),
             Cow::<str>::Owned("border-x".to_string())
         );
+    }
+
+    #[test]
+    fn key_bytes_compare_like_keys() {
+        let sorter = Sorter::new(&Config::default());
+        let classes = [
+            "flex",
+            "p-4",
+            "p-2",
+            "px-4",
+            "-mt-4",
+            "!mt-4",
+            "mt-4",
+            "hover:p-4",
+            "sm:hover:p-4",
+            "sm:p-4",
+            "md:p-4",
+            "min-[320px]:p-4",
+            "min-[640px]:p-4",
+            "data-[x]:p-4",
+            "foo:p-4",
+            "bar:p-4",
+            "foo:bar:p-4",
+            "foo:",
+            "bg-red-500",
+            "bg-red-500/50",
+            "bg-red-500/[.3]",
+            "bg-red-50",
+            "bg-brand",
+            "bg-[#fff]",
+            "border",
+            "border-t",
+            "border-t-2",
+            "border--x",
+            "border-x",
+            "w-[calc(100%-2rem)]",
+            "text-(length:--size)",
+            "custom",
+            "custom-a",
+            "a",
+            "ab",
+            "a\0b",
+            "a\0",
+            "inline-flex",
+            "inline",
+            "",
+            "-",
+            "!",
+            "hover:",
+            "z-[1]",
+            "z-10",
+            "z-auto",
+        ];
+        let keys: Vec<_> = classes.iter().map(|class| sorter.sort_key(class)).collect();
+        for a in &keys {
+            for b in &keys {
+                assert_eq!(
+                    a.to_bytes().cmp(&b.to_bytes()),
+                    a.cmp(b),
+                    "{} vs {}",
+                    a.original,
+                    b.original
+                );
+            }
+        }
+        // Nul bytes and terminators
+        let mut out = Vec::new();
+        push_terminated(&mut out, "a\0");
+        assert_eq!(out, b"a\0\xff\0\0");
+    }
+
+    #[test]
+    fn cached_sorting_matches_sorting() {
+        let sorter = Sorter::new(&Config::default());
+        let mut cache = KeyCache::default();
+        for list in [
+            "p-4 flex p-4 container",
+            "hover:bg-red-500 bg-red-500 sm:p-2 p-2 flex",
+            "b a c a b",
+            "flex",
+        ] {
+            let classes: Vec<&str> = list.split_whitespace().collect();
+            assert_eq!(
+                sorter.sort_classes_cached(&classes, &mut cache),
+                sorter.sort_classes(&classes)
+            );
+        }
     }
 
     #[test]
