@@ -166,6 +166,34 @@ fn help_and_version() {
 }
 
 #[test]
+fn invalid_arguments_are_usage_errors() {
+    let tmp = TempDir::new().unwrap();
+    for (args, message) in [
+        (&["--bogus"][..], "'--bogus'"),
+        (&["-x"], "'-x'"),
+        (&["-c"], "'-c'"),
+    ] {
+        let run = tailwhip(args, tmp.path(), None);
+        assert_eq!(run.code, 2, "{args:?}");
+        assert!(run.stderr.contains(message), "{}", run.stderr);
+        assert!(run.stderr.contains("--help"), "{}", run.stderr);
+    }
+    // Short flags combine, and values attach in either form
+    write(tmp.path(), "a.html", r#"<p class="p-4 m-2">"#);
+    write(tmp.path(), "c.toml", "verbosity = 1\n");
+    for args in [
+        &["-wvq", "a.html"][..],
+        &["a.html", "-cc.toml", "--configuration=c.toml"],
+    ] {
+        assert_eq!(tailwhip(args, tmp.path(), None).code, 0, "{args:?}");
+    }
+    assert_eq!(
+        fs::read_to_string(tmp.path().join("a.html")).unwrap(),
+        r#"<p class="m-2 p-4">"#
+    );
+}
+
+#[test]
 fn no_arguments_reads_empty_stdin() {
     let tmp = TempDir::new().unwrap();
     let run = tailwhip(&[], tmp.path(), None);
@@ -554,14 +582,6 @@ fn custom_patterns_from_pyproject() {
         "pyproject.toml",
         r#"
 [[tool.tailwhip.class_patterns]]
-name = "html_class"
-regex = '(?i)\bclass\s*=\s*"(?P<classes>[^"]*)"'
-
-[[tool.tailwhip.class_patterns]]
-name = "css_apply"
-regex = '@apply\s+(?P<classes>[^;]+);'
-
-[[tool.tailwhip.class_patterns]]
 name = "jsx_classname"
 regex = '\bclassName\s*=\s*"(?P<classes>[^"]*)"'
 "#,
@@ -633,10 +653,16 @@ fn found(args: &[&str], cwd: &Path) -> Vec<String> {
 #[test]
 fn finds_files_in_directories() {
     let tmp = fixture_tree();
+    // Hidden directories are skipped, unless asked for
     assert_eq!(
         found(&["."], tmp.path()),
+        ["index.html", "page.html", "styles.css"]
+    );
+    assert_eq!(
+        found(&[".", "--no-ignore"], tmp.path()),
         ["index.html", "page.html", "secret.html", "styles.css"]
     );
+    assert_eq!(found(&[".hidden"], tmp.path()), ["secret.html"]);
     assert_eq!(found(&["templates/"], tmp.path()), ["page.html"]);
     assert_eq!(
         found(
@@ -667,6 +693,10 @@ fn finds_files_by_glob() {
     assert_eq!(found(&["templates/*.html"], tmp.path()), ["page.html"]);
     assert_eq!(
         found(&["**/*.html"], tmp.path()),
+        ["index.html", "page.html"]
+    );
+    assert_eq!(
+        found(&["**/*.html", "--no-ignore"], tmp.path()),
         ["index.html", "page.html", "secret.html"]
     );
     assert_eq!(
@@ -683,6 +713,56 @@ fn finds_files_by_glob() {
     );
     assert!(found(&["nonexistent/*.html"], tmp.path()).is_empty());
     assert!(found(&["*.css"], &tmp.path().join("templates")).is_empty());
+}
+
+#[test]
+fn gitignore_applies_inside_a_repository() {
+    let tmp = TempDir::new().unwrap();
+    let repo = tmp.path().join("repo");
+    for name in [
+        "app/page.html",
+        "app/build/out.html",
+        "node_modules/pkg/index.html",
+        "static/kept.css",
+        "static/vendor.css",
+        "nested/.gitignore",
+        "nested/a.html",
+        "nested/b.html",
+    ] {
+        write(&repo, name, "");
+    }
+    fs::create_dir(repo.join(".git")).unwrap();
+    write(
+        &repo,
+        ".gitignore",
+        "node_modules\nbuild/\n/static/*.css\n!/static/kept.css\n",
+    );
+    write(&repo, "nested/.gitignore", "a.html\n");
+
+    assert_eq!(found(&["."], &repo), ["b.html", "kept.css", "page.html"]);
+    // From a subdirectory, the .gitignore files above it still apply
+    assert_eq!(found(&["."], &repo.join("app")), ["page.html"]);
+    assert_eq!(found(&["app"], &repo), ["page.html"]);
+    // Ignored directories passed by name are walked, and files passed by
+    // name are always processed
+    assert_eq!(found(&["node_modules"], &repo), ["index.html"]);
+    assert_eq!(found(&["nested/a.html"], &repo), ["a.html"]);
+    assert_eq!(
+        found(&[".", "--no-ignore"], &repo),
+        [
+            "a.html",
+            "b.html",
+            "index.html",
+            "kept.css",
+            "out.html",
+            "page.html",
+            "vendor.css"
+        ]
+    );
+
+    // Outside of a repository, .gitignore files mean nothing
+    fs::remove_dir(repo.join(".git")).unwrap();
+    assert_eq!(found(&["nested"], &repo), ["a.html", "b.html"]);
 }
 
 #[test]

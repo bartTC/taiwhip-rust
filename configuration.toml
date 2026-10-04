@@ -855,11 +855,18 @@ alphas = [
 # Pattern Matching (Advanced)
 # ----------------------------------------------------------------------------
 #
-# These patterns define where Tailwhip finds classes to sort (HTML attributes,
-# CSS @apply directives, JSX props, ...). Each pattern is a regular expression
-# with a named group "classes". Only the text matched by that group is
-# replaced, with the same classes in sorted order; everything around it stays
-# exactly as written, including quotes, spacing and letter case.
+# Built in, and always applied first: class lists in HTML attributes,
+# class="..." and class='...' (any letter case, whitespace allowed around
+# the "="), and in CSS @apply rules (@apply ... ;). They are found without a
+# regex engine, which is the fastest way to start and to scan.
+#
+# class_patterns ADDS patterns for other syntaxes (JSX props, Vue bindings,
+# ...). Each one is a regular expression with a named group "classes". Only
+# the text matched by that group is replaced, with the same classes in
+# sorted order; everything around it stays exactly as written, including
+# quotes, spacing and letter case. Patterns are applied in order, after the
+# built-in ones. Every pattern compiles on each start, which costs 0.1 to
+# 0.2 ms.
 #
 # SYNTAX: Rust regex syntax, see https://docs.rs/regex/latest/regex/#syntax
 #   - Named groups are written (?P<classes>...) or (?<classes>...)
@@ -868,30 +875,15 @@ alphas = [
 #     attribute names and several times faster to scan for
 #   - Backreferences and lookaround are not supported. Quote styles are
 #     therefore separate patterns: "..." and '...' each get their own entry
-#
-# CUSTOMIZATION:
-#   IMPORTANT: Custom class_patterns REPLACE (not extend) the defaults, just like
-#   any other configuration setting. If you define class_patterns, you must include
-#   the default HTML and CSS patterns if you want to keep them.
+#   - Fastest: a classes group of the form [^"]* between two quotes, as in
+#     the examples, which is found without the regex's capture engine
 #
 # EXAMPLES:
-#   - JSX:    regex = '''(?-u:\b)className\s*=\s*"(?P<classes>[^"]*)"'''
+#   [[class_patterns]]
+#   name = "jsx"
+#   regex = '''(?-u:\b)className\s*=\s*"(?P<classes>[^"]*)"'''
+#
 #   - Vue:    regex = ''':class\s*=\s*"(?P<classes>[^"]*)"'''
 #   - Svelte: regex = '''(?-u:\b)class:\w+\s*=\s*"(?P<classes>[^"]*)"'''
-#
-# RECOMMENDATION: The default patterns cover most use cases. Only add patterns
-# if you're working with frameworks or syntaxes not covered below.
 
-[[class_patterns]]
-name = "html_class"
-regex = '''(?i)(?-u:\b)class\s*=\s*"(?P<classes>[^"]*)"'''
-
-# The same for single quotes. Written as a basic string, where "\\" is one
-# backslash, because a literal string cannot end in a single quote.
-[[class_patterns]]
-name = "html_class_single_quoted"
-regex = "(?i)(?-u:\\b)class\\s*=\\s*'(?P<classes>[^']*)'"
-
-[[class_patterns]]
-name = "css_apply"
-regex = '''(?i)@apply\s+(?P<classes>[^;]+);'''
+class_patterns = []

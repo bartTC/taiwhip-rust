@@ -4,7 +4,7 @@
 use std::time::Instant;
 
 use tailwhip::config::Config;
-use tailwhip::process::Processor;
+use tailwhip::process::{Pattern, Processor};
 use tailwhip::sorting::Sorter;
 
 fn main() {
@@ -17,7 +17,7 @@ fn main() {
 
     for spec in &config.class_patterns {
         let t = Instant::now();
-        let _ = regex::Regex::new(&spec.regex).unwrap();
+        let _ = Pattern::compile(spec).unwrap();
         println!("  compile {}: {:?}", spec.name, t.elapsed());
     }
     let t = Instant::now();
@@ -25,17 +25,23 @@ fn main() {
     println!("  build sorter tables: {:?}", t.elapsed());
     let t = Instant::now();
     let processor = Processor::new(&config).unwrap();
-    println!("build processor (regexes + tables): {:?}", t.elapsed());
+    println!(
+        "build processor (tables, configured regexes): {:?}",
+        t.elapsed()
+    );
 
     let t = Instant::now();
     let mut attrs: Vec<&str> = Vec::new();
-    for spec in &config.class_patterns {
-        let regex = regex::Regex::new(&spec.regex).unwrap();
-        let before = attrs.len();
-        for caps in regex.captures_iter(&text) {
-            attrs.push(caps.name("classes").unwrap().as_str());
-        }
-        println!("  scan {}: {} matches", spec.name, attrs.len() - before);
+    for pattern in processor.patterns() {
+        let t = Instant::now();
+        let spans = pattern.spans(&text);
+        println!(
+            "  scan {}: {:?} ({} matches)",
+            pattern.name,
+            t.elapsed(),
+            spans.len()
+        );
+        attrs.extend(spans.iter().map(|&(start, end)| &text[start..end]));
     }
     println!(
         "regex scans only: {:?} ({} matches)",

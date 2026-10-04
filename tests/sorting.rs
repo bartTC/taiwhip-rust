@@ -6,7 +6,7 @@ use std::path::Path;
 
 use tailwhip::config::Config;
 use tailwhip::process::Processor;
-use tailwhip::sorting::Sorter;
+use tailwhip::sorting::{KeyCache, Sorter};
 
 fn sorter() -> Sorter {
     Sorter::new(&Config::default())
@@ -412,7 +412,7 @@ fn configuration_changes_take_effect() {
 fn unknown_component_names_are_ignored() {
     let config = Config {
         component_order: ["variant", "prefix", "value", "bogus"]
-            .map(String::from)
+            .map(Into::into)
             .to_vec(),
         ..Config::default()
     };
@@ -458,14 +458,6 @@ fn custom_patterns_from_a_config_file() {
         .apply_toml(
             r#"
 [[class_patterns]]
-name = "html_class"
-regex = '(?i)\bclass\s*=\s*"(?P<classes>[^"]*)"'
-
-[[class_patterns]]
-name = "css_apply"
-regex = '@apply\s+(?P<classes>[^;]+);'
-
-[[class_patterns]]
 name = "jsx_classname"
 regex = '\bclassName\s*=\s*"(?P<classes>[^"]*)"'
 "#,
@@ -478,7 +470,16 @@ regex = '\bclassName\s*=\s*"(?P<classes>[^"]*)"'
         .iter()
         .map(|p| p.name.as_str())
         .collect();
-    assert_eq!(names, ["html_class", "css_apply", "jsx_classname"]);
+    // Configured patterns come after the built-in ones
+    assert_eq!(
+        names,
+        [
+            "html_class",
+            "html_class_single_quoted",
+            "css_apply",
+            "jsx_classname"
+        ]
+    );
 
     assert_eq!(
         processor.process_text(r#"<Component className="p-4 m-2 flex" />"#),
@@ -492,10 +493,9 @@ regex = '\bclassName\s*=\s*"(?P<classes>[^"]*)"'
         processor.process_text(".btn { @apply p-4 m-2 flex; }"),
         ".btn { @apply flex m-2 p-4; }"
     );
-    // Single quotes are no longer covered by this custom set
     assert_eq!(
         processor.process_text("<div class='p-4 m-2'>"),
-        "<div class='p-4 m-2'>"
+        "<div class='m-2 p-4'>"
     );
 }
 
@@ -597,6 +597,48 @@ fn golden_groups_survive_random_shuffles() {
                 group,
                 "group starting with {:?}, shuffle round {round}: {shuffled:?}",
                 group[0]
+            );
+        }
+    }
+}
+
+#[test]
+fn golden_groups_survive_random_shuffles_with_cached_keys() {
+    let sorter = sorter();
+    // One cache for all groups, as a thread keeps it across class lists
+    let mut cache = KeyCache::default();
+    let mut rng = Rng(0x2545_F491_4F6C_DD1D);
+    for group in class_groups() {
+        for round in 0..25 {
+            let mut shuffled = group.clone();
+            rng.shuffle(&mut shuffled);
+            assert_eq!(
+                sorter.sort_classes_cached(&shuffled, &mut cache),
+                group,
+                "group starting with {:?}, shuffle round {round}: {shuffled:?}",
+                group[0]
+            );
+        }
+    }
+}
+
+#[test]
+fn key_bytes_order_golden_classes_like_keys() {
+    let sorter = sorter();
+    let keys: Vec<_> = class_groups()
+        .into_iter()
+        .flatten()
+        .map(|class| sorter.sort_key(class))
+        .collect();
+    let bytes: Vec<_> = keys.iter().map(|key| key.to_bytes()).collect();
+    for (a, a_bytes) in keys.iter().zip(&bytes) {
+        for (b, b_bytes) in keys.iter().zip(&bytes) {
+            assert_eq!(
+                a_bytes.cmp(b_bytes),
+                a.cmp(b),
+                "{} vs {}",
+                a.original,
+                b.original
             );
         }
     }

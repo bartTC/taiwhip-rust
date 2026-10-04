@@ -31,9 +31,9 @@
 <text x="524" y="61">thread 1</text><text x="524" y="101">thread 2</text><text x="524" y="141">thread 3</text><text x="524" y="181">thread 4</text>
 <text x="671" y="61" font-size="11">read, scan, sort</text><text x="671" y="101" font-size="11">read, scan, sort</text><text x="671" y="141" font-size="11">read, scan, sort</text><text x="671" y="181" font-size="11">read, scan, sort</text>
 <text x="775" y="110" font-size="10" fill="#a3a9b5">reads</text>
-<text x="845" y="112">patterns, tables</text><text x="845" y="127" font-size="10" fill="#a3a9b5">shared, read-only</text><text x="845" y="139" font-size="10" fill="#a3a9b5">cache per thread</text>
+<text x="845" y="112">patterns, tables</text><text x="845" y="127" font-size="10" fill="#a3a9b5">shared, read-only</text><text x="845" y="139" font-size="10" fill="#a3a9b5">caches per thread</text>
 </g>
 <g fill="#a3a9b5" font-size="11">
-<text x="20" y="226">16 cores, one of them sorting.</text><text x="480" y="226">16 cores, all of them sorting, no lock on the hot path.</text>
+<text x="20" y="226">16 cores, one of them sorting.</text><text x="480" y="226">Every thread sorting at once, no lock on the hot path.</text>
 </g>
 </svg>

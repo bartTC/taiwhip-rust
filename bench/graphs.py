@@ -14,11 +14,11 @@ DOCS = Path(__file__).resolve().parent.parent / "docs"
 
 # Median and minimum wall clock in ms, Python then Rust
 CASES = [
-    ("One-line stdin call", "editor integration", (67.0, 65.9), (3.3, 3.2)),
-    ("3.8 MB file on stdin", "24,690 class lists", (195.6, 193.5), (51.7, 49.2)),
-    ("Dry run, 525 synthetic files", "3.9 MB", (284.3, 281.7), (14.9, 14.5)),
-    ("Dry run, 165 real templates", "Django project", (115.0, 113.0), (7.0, 6.5)),
-    ("Dry run, 252 real templates", "second Django project", (138.5, 137.3), (18.3, 17.4)),
+    ("One-line stdin call", "editor integration", (71.4, 69.1), (2.9, 2.5)),
+    ("3.8 MB file on stdin", "24,690 class lists", (202.8, 200.4), (32.0, 31.0)),
+    ("Dry run, 525 synthetic files", "3.9 MB", (296.7, 291.0), (11.4, 10.2)),
+    ("Dry run, 165 real templates", "Django project", (122.8, 117.9), (4.9, 4.5)),
+    ("Dry run, 252 real templates", "second Django project", (144.2, 139.8), (7.5, 6.8)),
 ]
 AXIS_MAX = 300
 
@@ -66,7 +66,7 @@ def wall_clock() -> str:
     return "\n".join(out)
 
 
-WORKFLOW = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 290" __FONT__ role="img" aria-label="A run loads the configuration, then either sorts piped stdin and writes it back, or finds files and processes each one on all cores">
+WORKFLOW = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 290" __FONT__ role="img" aria-label="A run loads the configuration, then either sorts piped stdin and writes it back, or finds files in parallel, skipping ignored ones, and processes each one on the thread pool as soon as it is found">
 <rect width="920" height="290" fill="__BG__"/>
 <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="__TEXT__"/></marker></defs>
 <g fill="none" stroke="__TEXT__" stroke-width="1.2" marker-end="url(#arrow)">
@@ -76,7 +76,7 @@ WORKFLOW = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 290" __FO
 <line x1="556" y1="150" x2="580" y2="150"/><line x1="710" y1="150" x2="734" y2="150"/><line x1="811" y1="172" x2="811" y2="224"/>
 </g>
 <rect x="160" y="108" width="740" height="88" rx="8" fill="none" stroke="__ACCENT__" stroke-width="1.2" stroke-dasharray="5 4"/>
-<text x="172" y="121" font-size="10" fill="__ACCENT__" font-weight="600" letter-spacing="0.06em">PER FILE, ON ALL CORES</text>
+<text x="172" y="121" font-size="10" fill="__ACCENT__" font-weight="600" letter-spacing="0.06em">PER FILE, ON THE THREAD POOL, WHILE FILES ARE STILL BEING FOUND</text>
 <g stroke="__TEXT__" stroke-width="1.2" fill="__SURFACE__">
 <rect x="20" y="24" width="116" height="44" rx="6"/><rect x="166" y="24" width="190" height="44" rx="6"/><rect x="386" y="24" width="110" height="44" rx="22"/>
 <rect x="526" y="24" width="96" height="44" rx="6"/><rect x="652" y="24" width="120" height="44" rx="6"/><rect x="802" y="24" width="98" height="44" rx="6"/>
@@ -89,13 +89,13 @@ WORKFLOW = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 290" __FO
 <text x="261" y="43">Load configuration</text><text x="261" y="58" font-size="10" fill="__MUTED__">defaults → pyproject → file → flags</text>
 <text x="441" y="50">stdin piped?</text><text x="511" y="39" font-size="10" fill="__MUTED__">yes</text><text x="455" y="90" font-size="10" fill="__MUTED__">no</text>
 <text x="574" y="50">Read stdin</text><text x="712" y="50">Sort class lists</text><text x="851" y="50">Write stdout</text>
-<text x="78" y="147">Find files</text><text x="78" y="162" font-size="10" fill="__MUTED__">walk, globs, dedupe</text>
+<text x="78" y="147">Find files</text><text x="78" y="162" font-size="10" fill="__MUTED__">skips git-ignored</text>
 <text x="219" y="154">Read file</text>
-<text x="350" y="147">Find class lists</text><text x="350" y="162" font-size="10" fill="__MUTED__">regex, classes group</text>
-<text x="497" y="147">Sort each list</text><text x="497" y="162" font-size="10" fill="__MUTED__">cache per thread</text>
+<text x="350" y="147">Find class lists</text><text x="350" y="162" font-size="10" fill="__MUTED__">scanners, added regexes</text>
+<text x="497" y="147">Sort each list</text><text x="497" y="162" font-size="10" fill="__MUTED__">keys cached per thread</text>
 <text x="646" y="154">Splice, compare</text>
 <text x="811" y="147">Write or report</text><text x="811" y="162" font-size="10" fill="__MUTED__">--write, or "Would update"</text>
-<text x="811" y="245">Summary</text><text x="811" y="260" font-size="10" fill="__MUTED__">changed, skipped, time</text>
+<text x="811" y="245">Print reports</text><text x="811" y="260" font-size="10" fill="__MUTED__">in path order, then summary</text>
 </g>
 </svg>
 '''
@@ -133,10 +133,10 @@ THREADS = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 250" __FON
 <text x="524" y="61">thread 1</text><text x="524" y="101">thread 2</text><text x="524" y="141">thread 3</text><text x="524" y="181">thread 4</text>
 <text x="671" y="61" font-size="11">read, scan, sort</text><text x="671" y="101" font-size="11">read, scan, sort</text><text x="671" y="141" font-size="11">read, scan, sort</text><text x="671" y="181" font-size="11">read, scan, sort</text>
 <text x="775" y="110" font-size="10" fill="__MUTED__">reads</text>
-<text x="845" y="112">patterns, tables</text><text x="845" y="127" font-size="10" fill="__MUTED__">shared, read-only</text><text x="845" y="139" font-size="10" fill="__MUTED__">cache per thread</text>
+<text x="845" y="112">patterns, tables</text><text x="845" y="127" font-size="10" fill="__MUTED__">shared, read-only</text><text x="845" y="139" font-size="10" fill="__MUTED__">caches per thread</text>
 </g>
 <g fill="__MUTED__" font-size="11">
-<text x="20" y="226">16 cores, one of them sorting.</text><text x="480" y="226">16 cores, all of them sorting, no lock on the hot path.</text>
+<text x="20" y="226">16 cores, one of them sorting.</text><text x="480" y="226">Every thread sorting at once, no lock on the hot path.</text>
 </g>
 </svg>
 '''
